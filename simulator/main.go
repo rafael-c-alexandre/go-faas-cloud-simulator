@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 )
@@ -94,34 +95,35 @@ func estimateRelevantInvocations(listInvocations []functionProfile) {
 			allInvocations += minuteCardinality
 		}
 	}
-
-	fmt.Printf("Number of total invocations: %d\n", allInvocations)
-	fmt.Printf("Fraction of invocations with > 1 sec: %.3f\n", float32(relevantInvocations1)/float32(allInvocations))
-	fmt.Printf("Fraction of invocations with > 10 sec: %.3f\n", float32(relevantInvocations10)/float32(allInvocations))
-	fmt.Printf("Fraction of invocations with > 20 sec: %.3f\n", float32(relevantInvocations20)/float32(allInvocations))
-	fmt.Printf("Fraction of invocations with > 30 sec: %.3f\n", float32(relevantInvocations30)/float32(allInvocations))
-	fmt.Printf("Fraction of invocations with > 40 sec: %.3f\n", float32(relevantInvocations40)/float32(allInvocations))
-	fmt.Printf("Fraction of invocations with > 50 sec: %.3f\n", float32(relevantInvocations50)/float32(allInvocations))
-	fmt.Printf("Fraction of invocations with > 60 sec: %.3f\n", float32(relevantInvocations60)/float32(allInvocations))
+	log.Println()
+	log.Println("-------------- Dataset Statistics -------------")
+	log.Printf("Number of total invocations: %d\n", allInvocations)
+	log.Printf("Fraction of invocations with > 1 sec: %.3f\n", float32(relevantInvocations1)/float32(allInvocations))
+	log.Printf("Fraction of invocations with > 10 sec: %.3f\n", float32(relevantInvocations10)/float32(allInvocations))
+	log.Printf("Fraction of invocations with > 20 sec: %.3f\n", float32(relevantInvocations20)/float32(allInvocations))
+	log.Printf("Fraction of invocations with > 30 sec: %.3f\n", float32(relevantInvocations30)/float32(allInvocations))
+	log.Printf("Fraction of invocations with > 40 sec: %.3f\n", float32(relevantInvocations40)/float32(allInvocations))
+	log.Printf("Fraction of invocations with > 50 sec: %.3f\n", float32(relevantInvocations50)/float32(allInvocations))
+	log.Printf("Fraction of invocations with > 60 sec: %.3f\n", float32(relevantInvocations60)/float32(allInvocations))
 }
 
 func prepareSimulation() {
 	//Read the csv files into structure arrays
-	fmt.Println("Reading the invocations per function files")
+	log.Println("Reading the invocations per function files")
 	var listInvocations []functionProfile
 	for i := 5; i < 6; i++ {
 		listInvocations = append(listInvocations,
 			readInvocationCsvFile(fmt.Sprintf("dataset/invocations_per_function_md.anon.d0%d.csv", i))...)
 	}
 
-	fmt.Println("Reading the app memory files")
+	log.Println("Reading the app memory files")
 	var listMemory []appMemory
 	for i := 5; i < 6; i++ {
 		listMemory = append(listMemory,
 			readAppMemoryCsvFile(fmt.Sprintf("dataset/app_memory_percentiles.anon.d0%d.csv", i))...)
 	}
 
-	fmt.Println("Reading the function duration files")
+	log.Println("Reading the function duration files")
 	var functionDuration []functionExecutionDuration
 	for i := 5; i < 6; i++ {
 		functionDuration = append(functionDuration,
@@ -129,9 +131,9 @@ func prepareSimulation() {
 	}
 
 	//Add the durations and memory to the invocation structure, so we have everything in the same array
-	fmt.Println("Joining the average durations to each function")
+	log.Println("Joining the average durations to each function")
 	listInvocations = addDurations(listInvocations, functionDuration)
-	fmt.Println("Joining the average memory usage to each function")
+	log.Println("Joining the average memory usage to each function")
 	listInvocations = addMemories(listInvocations, listMemory)
 
 	estimateRelevantInvocations(listInvocations)
@@ -139,8 +141,7 @@ func prepareSimulation() {
 	// Create folder for serialized dataset object
 	err := os.MkdirAll(RESOURCES_PATH, os.ModePerm)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		log.Fatalf("Caught error: %s", err)
 	}
 
 	var fileBuffer bytes.Buffer
@@ -156,19 +157,16 @@ func prepareSimulation() {
 
 	file, err := os.OpenFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH), os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		log.Fatalf("Caught error: %s", err)
 	}
 
 	_, err = file.Write(fileBuffer.Bytes())
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		log.Fatalf("Caught error: %s", err)
 	}
 
 	if err = file.Close(); err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		log.Fatalf("Caught error: %s", err)
 	}
 
 }
@@ -176,8 +174,7 @@ func run() {
 
 	fileData, err := os.ReadFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH))
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		log.Fatalf("Caught error: %s", err)
 	}
 
 	var listInvocations []functionProfile
@@ -203,13 +200,16 @@ func main() {
 
 	switch operation {
 	case "prepare":
+		log.Println("Operation: Prepare")
 		prepareSimulation()
 	case "run":
+		log.Println("Operation: Run")
 		run()
 	default:
-		fmt.Println("Missing operation argument.")
-		os.Exit(-1)
+		log.Fatal("Missing operation argument.")
 	}
+
+	log.Println("Done")
 
 	/*
 		fmt.Printf("The simulation took %s\n", timeElapsed)

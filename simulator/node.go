@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"sort"
 )
 
@@ -95,7 +95,7 @@ func removeOrderedContainers(ordered []*OrderedContainers, appName string) []*Or
 		}
 	}
 	if len(ordered) == idx {
-		fmt.Print("oops\n")
+		log.Print("oops\n")
 	}
 	return append(ordered[:idx], ordered[idx+1:]...)
 }

@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"log"
+)
 
 const INSTANCE_MEMORY = 32 * 1024 * 1024 * 1024 // 32 gb memory
 
@@ -31,7 +33,7 @@ func (i *Instance) UpdateStatus(step int) {
 		invocation.remainingTime -= step
 
 		if invocation.remainingTime <= 0 {
-			fmt.Printf("Instance %s: Invocation %s finished\n", i.id, invocation.id)
+			log.Printf("Instance %s: Invocation %s finished\n", i.id, invocation.id)
 			delete(i.functionsRunning, invocation.id)
 		}
 	}

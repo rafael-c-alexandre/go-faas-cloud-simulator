@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/gob"
-	"fmt"
+	"log"
 	"math/rand"
 	"time"
 )
@@ -35,7 +35,7 @@ func interfaceEncode[I any](enc *gob.Encoder, i I) {
 	// See the blog post, "The Laws of Reflection" for background.
 	err := enc.Encode(&i)
 	if err != nil {
-		fmt.Printf("Encode error:%s\n", err)
+		log.Fatalf("Caught error:%s", err)
 	}
 }
 
@@ -45,7 +45,7 @@ func interfaceDecode[I any](dec *gob.Decoder, i I) I {
 	// registered. We registered it in the calling function.
 	err := dec.Decode(&i)
 	if err != nil {
-		fmt.Printf("Decode error:%s\n", err)
+		log.Fatalf("Caught error:%s", err)
 	}
 	return i
 }
