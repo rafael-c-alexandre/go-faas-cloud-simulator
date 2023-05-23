@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
+	"flag"
 	"fmt"
+	"os"
 	"sync"
-	"time"
 )
 
 const N_NODES = 100
@@ -11,6 +14,7 @@ const NODE_MEMORY = 64000
 const N_THREADS = 8
 const UNLOAD_POLICY = "random"
 const MAX_DATASET_SIZE = 1000
+const RESOURCES_PATH = "./resources"
 
 type Statistics struct {
 	invocations    [N_NODES]int
@@ -21,98 +25,108 @@ type Statistics struct {
 }
 
 // This function adds the average duration of a function to the invocation count structure
-func addDurations(functionInvocations []functionInvocationCount, durations []functionExecutionDuration) []functionInvocationCount {
+func addDurations(functionInvocations []functionProfile, durations []functionExecutionDuration) []functionProfile {
 	for i := range functionInvocations {
-		functionInvocations[i].avgDuration = -1
+		functionInvocations[i].AvgDuration = -1
 		for j := range durations {
-			if functionInvocations[i].function == durations[j].function {
-				functionInvocations[i].avgDuration = durations[j].average
+			if functionInvocations[i].Function == durations[j].function {
+				functionInvocations[i].AvgDuration = durations[j].average
 				break
 			}
+		}
+	}
+	for i := range functionInvocations {
+		if functionInvocations[i].AvgDuration == -1 || functionInvocations[i].AvgDuration < 1000 {
+			RemoveFromList(functionInvocations, i)
 		}
 	}
 	return functionInvocations
 }
 
 // This function adds the average memory of a function to the invocation count structure
-func addMemories(functionInvocations []functionInvocationCount, memoryUsages []appMemory) []functionInvocationCount {
+func addMemories(functionInvocations []functionProfile, memoryUsages []appMemory) []functionProfile {
 	for i := range functionInvocations {
-		functionInvocations[i].avgMemory = -1
+		functionInvocations[i].AvgMemory = -1
 		for j := range memoryUsages {
-			if functionInvocations[i].app == memoryUsages[j].app {
-				functionInvocations[i].avgMemory = memoryUsages[j].average
+			if functionInvocations[i].App == memoryUsages[j].app {
+				functionInvocations[i].AvgMemory = memoryUsages[j].average
 				break
 			}
+		}
+	}
+	for i := range functionInvocations {
+		if functionInvocations[i].AvgMemory == -1 {
+			RemoveFromList(functionInvocations, i)
 		}
 	}
 	return functionInvocations
 }
 
-func allocLoop(listInvocations []functionInvocationCount, nodeList [N_NODES]Node, firstNode, lastNode, start int, end int, stats *Statistics) {
+func estimateRelevantInvocations(listInvocations []functionProfile) {
 
-	currentNode := firstNode
+	relevantInvocations1, relevantInvocations10, relevantInvocations20, relevantInvocations30,
+		relevantInvocations40, relevantInvocations50, relevantInvocations60,
+		allInvocations := 0, 0, 0, 0, 0, 0, 0, 0
 
-	// Look at each minute
-	for min := 1; min <= MINUTES_IN_DAY; min++ {
-
-		// Look at the functions for this node
-		for i := start; i < end; i++ {
-
-			//If the function doesn't have information about the memory or duration we skip it (don't invoke it)
-			if listInvocations[i].avgMemory == -1 || listInvocations[i].avgDuration == -1 {
-				continue
+	for i := 0; i < len(listInvocations); i++ {
+		for _, minuteCardinality := range listInvocations[i].PerMinute {
+			if listInvocations[i].AvgDuration > 1000 {
+				relevantInvocations1 += minuteCardinality
 			}
-
-			// Allocate memory for this minute for each invocation
-			for invocationCount := 0; invocationCount < listInvocations[i].perMinute[min]; invocationCount++ {
-				invocation := listInvocations[i]
-				allocateMemory(&nodeList[currentNode], invocation.app, min, invocation.avgMemory, invocation.avgDuration, stats)
-				stats.invocations[currentNode]++
-				currentNode++
-				if currentNode == lastNode {
-					currentNode = firstNode
-				}
+			if listInvocations[i].AvgDuration > 10000 {
+				relevantInvocations10 += minuteCardinality
 			}
+			if listInvocations[i].AvgDuration > 20000 {
+				relevantInvocations20 += minuteCardinality
+			}
+			if listInvocations[i].AvgDuration > 30000 {
+				relevantInvocations30 += minuteCardinality
+			}
+			if listInvocations[i].AvgDuration > 40000 {
+				relevantInvocations40 += minuteCardinality
+			}
+			if listInvocations[i].AvgDuration > 50000 {
+				relevantInvocations50 += minuteCardinality
+			}
+			if listInvocations[i].AvgDuration > 60000 {
+				relevantInvocations60 += minuteCardinality
+			}
+			allInvocations += minuteCardinality
 		}
-
-		stats.minutesLock.Lock()
-		stats.minuteProgress[min]++
-		if stats.minuteProgress[min] == N_THREADS {
-			fmt.Printf("Minute %d completed!\n", min)
-		}
-		stats.minutesLock.Unlock()
-
 	}
 
+	fmt.Printf("Number of total invocations: %d\n", allInvocations)
+	fmt.Printf("Fraction of invocations with > 1 sec: %.3f\n", float32(relevantInvocations1)/float32(allInvocations))
+	fmt.Printf("Fraction of invocations with > 10 sec: %.3f\n", float32(relevantInvocations10)/float32(allInvocations))
+	fmt.Printf("Fraction of invocations with > 20 sec: %.3f\n", float32(relevantInvocations20)/float32(allInvocations))
+	fmt.Printf("Fraction of invocations with > 30 sec: %.3f\n", float32(relevantInvocations30)/float32(allInvocations))
+	fmt.Printf("Fraction of invocations with > 40 sec: %.3f\n", float32(relevantInvocations40)/float32(allInvocations))
+	fmt.Printf("Fraction of invocations with > 50 sec: %.3f\n", float32(relevantInvocations50)/float32(allInvocations))
+	fmt.Printf("Fraction of invocations with > 60 sec: %.3f\n", float32(relevantInvocations60)/float32(allInvocations))
 }
 
-func threadFunc(threadN int, firstNode int, lastNode int, wg *sync.WaitGroup, listInvocations []functionInvocationCount, nodeList [N_NODES]Node, stats *Statistics) {
-
-	defer wg.Done()
-
-	allocLoop(listInvocations, nodeList, firstNode, lastNode, threadN*len(listInvocations)/N_THREADS, (threadN+1)*len(listInvocations)/N_THREADS, stats)
-
-}
-
-func main() {
-
-	//Measure the execution time
-	timeStart := time.Now()
-
-	//Initialize statistics struct
-	stats := new(Statistics)
-
+func prepareSimulation() {
 	//Read the csv files into structure arrays
-	fmt.Println("Reading the invocations per function file")
-	listInvocations := readInvocationCsvFile("dataset/invocations_per_function_md.anon.d01.csv")
-	//Cut the dataset
-	if MAX_DATASET_SIZE < len(listInvocations) {
-		listInvocations = listInvocations[:MAX_DATASET_SIZE]
+	fmt.Println("Reading the invocations per function files")
+	var listInvocations []functionProfile
+	for i := 5; i < 6; i++ {
+		listInvocations = append(listInvocations,
+			readInvocationCsvFile(fmt.Sprintf("dataset/invocations_per_function_md.anon.d0%d.csv", i))...)
 	}
-	fmt.Println("Reading the app memory file")
-	listMemory := readAppMemoryCsvFile("dataset/app_memory_percentiles.anon.d01.csv")
-	fmt.Println("Reading the function duration file")
-	functionDuration := readFunctionDurationCsvFile("dataset/function_durations_percentiles.anon.d09.csv")
+
+	fmt.Println("Reading the app memory files")
+	var listMemory []appMemory
+	for i := 5; i < 6; i++ {
+		listMemory = append(listMemory,
+			readAppMemoryCsvFile(fmt.Sprintf("dataset/app_memory_percentiles.anon.d0%d.csv", i))...)
+	}
+
+	fmt.Println("Reading the function duration files")
+	var functionDuration []functionExecutionDuration
+	for i := 5; i < 6; i++ {
+		functionDuration = append(functionDuration,
+			readFunctionDurationCsvFile(fmt.Sprintf("dataset/function_durations_percentiles.anon.d0%d.csv", i))...)
+	}
 
 	//Add the durations and memory to the invocation structure, so we have everything in the same array
 	fmt.Println("Joining the average durations to each function")
@@ -120,45 +134,87 @@ func main() {
 	fmt.Println("Joining the average memory usage to each function")
 	listInvocations = addMemories(listInvocations, listMemory)
 
-	// List of nodes
-	var listNodes [N_NODES]Node
+	estimateRelevantInvocations(listInvocations)
 
-	// Declare mutex and wait group
-	var wg sync.WaitGroup
-
-	//Add all the threads to the wait group
-	wg.Add(N_THREADS)
-	fmt.Printf("Size of the Dataset: %d\n", len(listInvocations))
-	//Create the number of nodes specified and send them to a thread
-
-	for num := 0; num < N_NODES; num++ {
-		listNodes[num] = newNode(NODE_MEMORY, 0)
+	// Create folder for serialized dataset object
+	err := os.MkdirAll(RESOURCES_PATH, os.ModePerm)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
 	}
 
-	for n := 0; n < N_THREADS; n++ {
-		go threadFunc(n, n*len(listNodes)/N_THREADS, (n+1)*len(listNodes)/N_THREADS, &wg, listInvocations, listNodes, stats)
+	var fileBuffer bytes.Buffer
+
+	// We must register the concrete type for the encoder and decoder (which would
+	// normally be on a separate machine from the encoder). On each end, this tells the
+	// engine which concrete type is being sent that implements the interface.
+	gob.Register([]functionProfile{})
+
+	// Create an encoder interface and send values
+	enc := gob.NewEncoder(&fileBuffer)
+	interfaceEncode(enc, listInvocations)
+
+	file, err := os.OpenFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH), os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
 	}
 
-	//Wait for the threads to finish
-	wg.Wait()
-	timeElapsed := time.Since(timeStart)
-
-	invocationsSum := 0
-	for i := range stats.invocations {
-		invocationsSum += stats.invocations[i]
-	}
-	failedInvocationsSum := 0
-	for i := range stats.failed {
-		failedInvocationsSum += stats.failed[i]
-	}
-	coldSum := 0
-	for i := range stats.coldStarts {
-		coldSum += stats.coldStarts[i]
+	_, err = file.Write(fileBuffer.Bytes())
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
 	}
 
-	fmt.Printf("The simulation took %s\n", timeElapsed)
-	fmt.Printf("Keep Alive: %d\n", KEEP_ALIVE_WINDOW)
-	fmt.Printf("Invocations: %d\n", invocationsSum)
-	fmt.Printf("Failed Invocations: %d\n", failedInvocationsSum)
-	fmt.Printf("Cold Starts: %d\n", coldSum)
+	if err = file.Close(); err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+
+}
+func run() {
+
+	fileData, err := os.ReadFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH))
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+
+	var listInvocations []functionProfile
+
+	// Create a decoder interface and receive values
+	dec := gob.NewDecoder(bytes.NewBuffer(fileData))
+	listInvocations = interfaceDecode(dec, listInvocations)
+
+}
+
+func main() {
+
+	//Measure the execution time
+	//timeStart := time.Now()
+
+	//Initialize statistics struct
+	//stats := new(Statistics)
+
+	var operation string
+
+	flag.StringVar(&operation, "operation", "operation", "Operation name (Options: prepare, run)")
+	flag.Parse()
+
+	switch operation {
+	case "prepare":
+		prepareSimulation()
+	case "run":
+		run()
+	default:
+		fmt.Println("Missing operation argument.")
+		os.Exit(-1)
+	}
+
+	/*
+		fmt.Printf("The simulation took %s\n", timeElapsed)
+		fmt.Printf("Keep Alive: %d\n", KEEP_ALIVE_WINDOW)
+		fmt.Printf("Invocations: %d\n", invocationsSum)
+		fmt.Printf("Failed Invocations: %d\n", failedInvocationsSum)
+		fmt.Printf("Cold Starts: %d\n", coldSum)*/
 }

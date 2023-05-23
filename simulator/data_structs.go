@@ -1,13 +1,19 @@
 package main
 
-type functionInvocationCount struct {
-	owner       string
-	app         string
-	function    string
-	trigger     string
-	perMinute   [1441]int
-	avgDuration int
-	avgMemory   int
+type functionInvocation struct {
+	id            string
+	profile       functionProfile
+	remainingTime int
+}
+
+type functionProfile struct {
+	Owner       string
+	App         string
+	Function    string
+	Trigger     string
+	PerMinute   [1441]int
+	AvgDuration int
+	AvgMemory   int
 }
 
 type functionExecutionDuration struct {

@@ -18,10 +18,10 @@ func atoi(s string) int {
 	return ret
 }
 
-// Read datasets about the invocation count and create an array of functionInvocationCount structs
-func readInvocationCsvFile(filename string) []functionInvocationCount {
+// Read datasets about the invocation count and create an array of functionProfile structs
+func readInvocationCsvFile(filename string) []functionProfile {
 
-	var functionInvocationCounts []functionInvocationCount
+	var functionInvocationCounts []functionProfile
 
 	//Open the file
 	f, err := os.Open(filename)
@@ -41,7 +41,7 @@ func readInvocationCsvFile(filename string) []functionInvocationCount {
 	csvReader := csv.NewReader(f)
 	isFirstLine := true
 	for {
-		var element functionInvocationCount
+		var element functionProfile
 		rec, err := csvReader.Read()
 		if err == io.EOF {
 			break
@@ -54,12 +54,12 @@ func readInvocationCsvFile(filename string) []functionInvocationCount {
 			continue
 		}
 		//Create the object
-		element.owner = rec[0]
-		element.app = rec[1]
-		element.function = rec[2]
-		element.trigger = rec[3]
+		element.Owner = rec[0]
+		element.App = rec[1]
+		element.Function = rec[2]
+		element.Trigger = rec[3]
 		for i := 1; i < 1441; i++ {
-			element.perMinute[i] = atoi(rec[i+3])
+			element.PerMinute[i] = atoi(rec[i+3])
 		}
 		functionInvocationCounts = append(functionInvocationCounts, element)
 	}
@@ -156,6 +156,7 @@ func readFunctionDurationCsvFile(filename string) []functionExecutionDuration {
 			isFirstLine = false
 			continue
 		}
+
 		//Create the object
 		element.owner = rec[0]
 		element.app = rec[1]
