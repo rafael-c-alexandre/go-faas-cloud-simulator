@@ -4,7 +4,6 @@ import (
 	"encoding/gob"
 	"log"
 	"math/rand"
-	"time"
 )
 
 // RandStringBytes generates a random string of length n
@@ -12,7 +11,7 @@ func RandStringBytes(n int) string {
 
 	letterBytes := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789"
 
-	rand.Seed(time.Now().Unix())
+	//rand.Seed(time.Now().Unix())
 
 	b := make([]byte, n)
 	for i := range b {
@@ -21,13 +20,13 @@ func RandStringBytes(n int) string {
 	return string(b)
 }
 
-func RemoveFromList[S any](s []S, i int) []S {
+func RemoveFromList[I any](s []I, i int) []I {
 	s[i] = s[len(s)-1]
 	return s[:len(s)-1]
 }
 
-// interfaceEncode encodes and saves the value to the encoder
-func interfaceEncode[I any](enc *gob.Encoder, i I) {
+// InterfaceEncode encodes and saves the value to the encoder
+func InterfaceEncode[I any](enc *gob.Encoder, i I) {
 	// The encode will fail unless the concrete type has been
 	// registered. We registered it in the calling function.
 	// Pass pointer to interface so Encode sees (and hence sends) a value of
@@ -39,8 +38,8 @@ func interfaceEncode[I any](enc *gob.Encoder, i I) {
 	}
 }
 
-// interfaceDecode decodes the value of the interface and returns
-func interfaceDecode[I any](dec *gob.Decoder, i I) I {
+// InterfaceDecode decodes the value of the interface and returns
+func InterfaceDecode[I any](dec *gob.Decoder, i I) I {
 	// The decode will fail unless the concrete type on the wire has been
 	// registered. We registered it in the calling function.
 	err := dec.Decode(&i)

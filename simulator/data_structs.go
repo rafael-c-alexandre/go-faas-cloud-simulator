@@ -1,17 +1,12 @@
 package main
 
-type functionInvocation struct {
-	id            string
-	profile       functionProfile
-	remainingTime int
-}
-
 type functionProfile struct {
+	Id          string
 	Owner       string
 	App         string
 	Function    string
 	Trigger     string
-	PerMinute   [1441]int
+	PerMinute   [1440]int
 	AvgDuration int
 	AvgMemory   int
 }

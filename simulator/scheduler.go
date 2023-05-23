@@ -4,24 +4,28 @@ type Scheduler struct {
 	cluster Cluster
 }
 
-func (s *Scheduler) RouteInvocation(invocation *functionInvocation) {
-	chosenInstance := s.getSuitableInstance(invocation.profile.AvgDuration)
+func (s *Scheduler) RouteInvocation(invocation functionInvocation, scaler Scaler) {
+	chosenInstance, err := s.getSuitableInstance(invocation.profile.AvgMemory)
 
-	if chosenInstance.currentAvailableMemory > invocation.profile.AvgMemory {
-		chosenInstance.RunNewFunction(invocation.id, invocation)
-	} else {
+	if err != nil || chosenInstance.currentAvailableMemory < invocation.profile.AvgMemory {
+		chosenInstance = scaler.ScaleUp()
 	}
+	chosenInstance.RunNewFunction(invocation.id, invocation)
 }
 
-func (s *Scheduler) getSuitableInstance(duration int) *Instance {
-	var suitableInstance *Instance
-	currentSuitableMemory := INSTANCE_MEMORY
+func (s *Scheduler) getSuitableInstance(memory int) (Instance, error) {
+	suitableInstance, err := s.cluster.GetOne()
+
+	if err != nil {
+		return Instance{}, err
+	}
+	currentSuitableMemory := suitableInstance.memory
 
 	for _, instance := range s.cluster.instances {
-		if instance.currentAvailableMemory > duration && instance.currentAvailableMemory < currentSuitableMemory {
+		if instance.currentAvailableMemory > memory && instance.currentAvailableMemory < currentSuitableMemory {
 			currentSuitableMemory = instance.currentAvailableMemory
 			suitableInstance = instance
 		}
 	}
-	return suitableInstance
+	return suitableInstance, nil
 }

@@ -27,7 +27,8 @@ type Statistics struct {
 
 // This function adds the average duration of a function to the invocation count structure
 func addDurations(functionInvocations []functionProfile, durations []functionExecutionDuration) []functionProfile {
-	for i := range functionInvocations {
+	i := 0
+	for i < len(functionInvocations) {
 		functionInvocations[i].AvgDuration = -1
 		for j := range durations {
 			if functionInvocations[i].Function == durations[j].function {
@@ -35,18 +36,20 @@ func addDurations(functionInvocations []functionProfile, durations []functionExe
 				break
 			}
 		}
-	}
-	for i := range functionInvocations {
 		if functionInvocations[i].AvgDuration == -1 || functionInvocations[i].AvgDuration < 1000 {
-			RemoveFromList(functionInvocations, i)
+			functionInvocations = RemoveFromList(functionInvocations, i)
+		} else {
+			i++
 		}
 	}
+
 	return functionInvocations
 }
 
 // This function adds the average memory of a function to the invocation count structure
 func addMemories(functionInvocations []functionProfile, memoryUsages []appMemory) []functionProfile {
-	for i := range functionInvocations {
+	i := 0
+	for i < len(functionInvocations) {
 		functionInvocations[i].AvgMemory = -1
 		for j := range memoryUsages {
 			if functionInvocations[i].App == memoryUsages[j].app {
@@ -54,12 +57,13 @@ func addMemories(functionInvocations []functionProfile, memoryUsages []appMemory
 				break
 			}
 		}
-	}
-	for i := range functionInvocations {
 		if functionInvocations[i].AvgMemory == -1 {
-			RemoveFromList(functionInvocations, i)
+			functionInvocations = RemoveFromList(functionInvocations, i)
+		} else {
+			i++
 		}
 	}
+
 	return functionInvocations
 }
 
@@ -107,6 +111,14 @@ func estimateRelevantInvocations(listInvocations []functionProfile) {
 	log.Printf("Fraction of invocations with > 60 sec: %.3f\n", float32(relevantInvocations60)/float32(allInvocations))
 }
 
+func ConvertListToMap(listInvocations []functionProfile) map[string]functionProfile {
+	result := map[string]functionProfile{}
+	for _, element := range listInvocations {
+		result[element.Id] = element
+	}
+	return result
+}
+
 func prepareSimulation() {
 	//Read the csv files into structure arrays
 	log.Println("Reading the invocations per function files")
@@ -136,7 +148,11 @@ func prepareSimulation() {
 	log.Println("Joining the average memory usage to each function")
 	listInvocations = addMemories(listInvocations, listMemory)
 
+	// Display dataset statistics
 	estimateRelevantInvocations(listInvocations)
+
+	listInvocationsMap := ConvertListToMap(listInvocations)
+	log.Println(len(listInvocationsMap))
 
 	// Create folder for serialized dataset object
 	err := os.MkdirAll(RESOURCES_PATH, os.ModePerm)
@@ -149,13 +165,13 @@ func prepareSimulation() {
 	// We must register the concrete type for the encoder and decoder (which would
 	// normally be on a separate machine from the encoder). On each end, this tells the
 	// engine which concrete type is being sent that implements the interface.
-	gob.Register([]functionProfile{})
+	gob.Register(map[string]functionProfile{})
 
 	// Create an encoder interface and send values
 	enc := gob.NewEncoder(&fileBuffer)
-	interfaceEncode(enc, listInvocations)
+	InterfaceEncode(enc, listInvocations)
 
-	file, err := os.OpenFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH), os.O_APPEND|os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	file, err := os.OpenFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH), os.O_TRUNC|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		log.Fatalf("Caught error: %s", err)
 	}
@@ -177,11 +193,11 @@ func run() {
 		log.Fatalf("Caught error: %s", err)
 	}
 
-	var listInvocations []functionProfile
+	var listInvocations map[string]functionProfile
 
 	// Create a decoder interface and receive values
 	dec := gob.NewDecoder(bytes.NewBuffer(fileData))
-	listInvocations = interfaceDecode(dec, listInvocations)
+	listInvocations = InterfaceDecode(dec, listInvocations)
 
 }
 

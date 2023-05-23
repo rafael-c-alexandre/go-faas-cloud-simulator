@@ -10,20 +10,21 @@ type Instance struct {
 	id                     string
 	memory                 int
 	currentAvailableMemory int
-	functionsRunning       map[string]*functionInvocation
+	functionsRunning       map[string]functionInvocation
 }
 
-func NewInstance() *Instance {
-	i := new(Instance)
-	i.id = RandStringBytes(5)
-	i.memory = INSTANCE_MEMORY
-	i.currentAvailableMemory = i.memory
-	i.functionsRunning = map[string]*functionInvocation{}
+func NewInstance() Instance {
+	i := Instance{
+		id:                     RandStringBytes(5),
+		memory:                 INSTANCE_MEMORY,
+		currentAvailableMemory: INSTANCE_MEMORY,
+		functionsRunning:       map[string]functionInvocation{},
+	}
 
 	return i
 }
 
-func (i *Instance) RunNewFunction(id string, invocation *functionInvocation) {
+func (i *Instance) RunNewFunction(id string, invocation functionInvocation) {
 	i.functionsRunning[id] = invocation
 	i.currentAvailableMemory -= invocation.profile.AvgMemory
 }

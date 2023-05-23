@@ -54,12 +54,13 @@ func readInvocationCsvFile(filename string) []functionProfile {
 			continue
 		}
 		//Create the object
+		element.Id = RandStringBytes(7)
 		element.Owner = rec[0]
 		element.App = rec[1]
 		element.Function = rec[2]
 		element.Trigger = rec[3]
-		for i := 1; i < 1441; i++ {
-			element.PerMinute[i] = atoi(rec[i+3])
+		for i := 0; i < 1440; i++ {
+			element.PerMinute[i] = atoi(rec[i+4])
 		}
 		functionInvocationCounts = append(functionInvocationCounts, element)
 	}
