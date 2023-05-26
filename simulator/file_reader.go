@@ -107,15 +107,16 @@ func readAppMemoryCsvFile(filename string) []appMemory {
 		element.owner = rec[0]
 		element.app = rec[1]
 		element.count = atoi(rec[2])
-		element.average = atoi(rec[3])
-		element.percentileAverage1 = atoi(rec[4])
-		element.percentileAverage5 = atoi(rec[5])
-		element.percentileAverage25 = atoi(rec[6])
-		element.percentileAverage50 = atoi(rec[7])
-		element.percentileAverage75 = atoi(rec[8])
-		element.percentileAverage95 = atoi(rec[9])
-		element.percentileAverage99 = atoi(rec[10])
-		element.percentileAverage100 = atoi(rec[11])
+		// Memory values in bytes
+		element.average = int64(atoi(rec[3]) * 1024 * 1024)
+		element.percentileAverage1 = int64(atoi(rec[4]) * 1024 * 1024)
+		element.percentileAverage5 = int64(atoi(rec[5]) * 1024 * 1024)
+		element.percentileAverage25 = int64(atoi(rec[6]) * 1024 * 1024)
+		element.percentileAverage50 = int64(atoi(rec[7]) * 1024 * 1024)
+		element.percentileAverage75 = int64(atoi(rec[8]) * 1024 * 1024)
+		element.percentileAverage95 = int64(atoi(rec[9]) * 1024 * 1024)
+		element.percentileAverage99 = int64(atoi(rec[10]) * 1024 * 1024)
+		element.percentileAverage100 = int64(atoi(rec[11]) * 1024 * 1024)
 
 		appMemoryUsages = append(appMemoryUsages, element)
 	}

@@ -48,3 +48,11 @@ func InterfaceDecode[I any](dec *gob.Decoder, i I) I {
 	}
 	return i
 }
+
+func MergeMaps[I any](m1 map[string]I, m2 map[string]I) map[string]I {
+	for k, v := range m2 {
+		m1[k] = v
+	}
+
+	return m1
+}

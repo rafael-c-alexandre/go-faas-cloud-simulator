@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sync"
+	"strconv"
 )
 
 const N_NODES = 100
@@ -16,14 +16,6 @@ const N_THREADS = 8
 const UNLOAD_POLICY = "random"
 const MAX_DATASET_SIZE = 1000
 const RESOURCES_PATH = "./resources"
-
-type Statistics struct {
-	invocations    [N_NODES]int
-	coldStarts     [N_NODES]int
-	failed         [N_NODES]int
-	minuteProgress [MINUTES_IN_DAY + 1]int
-	minutesLock    sync.Mutex
-}
 
 // This function adds the average duration of a function to the invocation count structure
 func addDurations(functionInvocations []functionProfile, durations []functionExecutionDuration) []functionProfile {
@@ -152,7 +144,6 @@ func prepareSimulation() {
 	estimateRelevantInvocations(listInvocations)
 
 	listInvocationsMap := ConvertListToMap(listInvocations)
-	log.Println(len(listInvocationsMap))
 
 	// Create folder for serialized dataset object
 	err := os.MkdirAll(RESOURCES_PATH, os.ModePerm)
@@ -165,11 +156,11 @@ func prepareSimulation() {
 	// We must register the concrete type for the encoder and decoder (which would
 	// normally be on a separate machine from the encoder). On each end, this tells the
 	// engine which concrete type is being sent that implements the interface.
-	gob.Register(map[string]functionProfile{})
+	gob.Register(map[string]*functionProfile{})
 
 	// Create an encoder interface and send values
 	enc := gob.NewEncoder(&fileBuffer)
-	InterfaceEncode(enc, listInvocations)
+	InterfaceEncode(enc, listInvocationsMap)
 
 	file, err := os.OpenFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH), os.O_TRUNC|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
@@ -186,7 +177,7 @@ func prepareSimulation() {
 	}
 
 }
-func run() {
+func run(load float32) {
 
 	fileData, err := os.ReadFile(fmt.Sprintf("%s/serialized_dataset", RESOURCES_PATH))
 	if err != nil {
@@ -199,6 +190,29 @@ func run() {
 	dec := gob.NewDecoder(bytes.NewBuffer(fileData))
 	listInvocations = InterfaceDecode(dec, listInvocations)
 
+	// Setup simulation
+	c := &Cluster{instances: map[string]*Instance{}}
+
+	simulation := Simulation{
+		cluster:   c,
+		scheduler: &Scheduler{cluster: c},
+		scaler: &Scaler{
+			cluster:      c,
+			scaleMinLoad: load,
+		},
+		profiles: listInvocations,
+		Statistics: &Statistics{
+			invocations:        0,
+			evictedInvocations: 0,
+		},
+	}
+
+	simulation.Run()
+	simulation.Finalize()
+
+	// Display simulation statistics
+	simulation.Statistics.Display()
+
 }
 
 func main() {
@@ -210,8 +224,10 @@ func main() {
 	//stats := new(Statistics)
 
 	var operation string
+	var minLoad string
 
 	flag.StringVar(&operation, "operation", "operation", "Operation name (Options: prepare, run)")
+	flag.StringVar(&minLoad, "minLoad", "0.3", "Minimum load to evict (0 < minLoad < 1)")
 	flag.Parse()
 
 	switch operation {
@@ -220,7 +236,12 @@ func main() {
 		prepareSimulation()
 	case "run":
 		log.Println("Operation: Run")
-		run()
+
+		load, err := strconv.ParseFloat(minLoad, 32)
+		if err != nil {
+			log.Fatalf("Caught error: %s", err)
+		}
+		run(float32(load))
 	default:
 		log.Fatal("Missing operation argument.")
 	}
