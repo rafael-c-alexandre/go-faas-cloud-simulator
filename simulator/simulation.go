@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+const SIMULATION_MINUTES = 1444
+const SIMULATION_DURATION = SIMULATION_MINUTES * 60
+
 type Simulation struct {
 	cluster    *Cluster
 	scheduler  *Scheduler
@@ -22,21 +25,22 @@ type Statistics struct {
 	timeElapsed        time.Duration
 	invocations        int
 	evictedInvocations int
+	totalResources     int
 }
 
-func (s *Simulation) schedule() [500][60][]string {
-	var schedule [500][60][]string
+func (s *Simulation) schedule(minute int) [60][]string {
+	var schedule [60][]string
 
 	for _, profile := range s.profiles {
-		for i, nInvocations := range profile.PerMinute[:500] {
-			j := 0
-			for j < nInvocations {
-				invocationTs := rand.Intn(59)
-				schedule[i][invocationTs] = append(schedule[i][invocationTs], profile.Id)
-				j++
-			}
+		nInvocations := profile.PerMinute[minute]
+		j := 0
+		for j < nInvocations {
+			invocationTs := rand.Intn(59)
+			schedule[invocationTs] = append(schedule[invocationTs], profile.Id)
+			j++
 		}
 	}
+
 	return schedule
 }
 
@@ -46,40 +50,37 @@ func (s *Simulation) Run() {
 
 	s.lock = sync.RWMutex{}
 
+	epoch := 0
+	minute := 0
+
 	// Schedule simulation
-	invocationSchedule := s.schedule()
+	invocationSchedule := s.schedule(minute)
+
 	// Launch one instance for the start of the simulation
-	s.cluster.AddInstance(NewInstance(), &s.lock)
+	s.cluster.AddInstance(NewInstance(epoch), &s.lock)
 
-	bar := progressbar.Default(500 * 60)
+	bar := progressbar.Default(SIMULATION_DURATION)
 
-	for _, minute := range invocationSchedule {
-		for _, second := range minute {
-
+	for i := 0; i < SIMULATION_MINUTES; i += 1 {
+		for _, second := range invocationSchedule {
+			epoch++
 			var wg sync.WaitGroup
 			wg.Add(3)
-
 			go s.updateStatus(&wg)
-			go s.scanCluster(&wg)
-			go s.newRound(second, &wg)
+			go s.scanCluster(epoch, &wg)
+			go s.newRound(second, epoch, &wg)
 			wg.Wait()
 			bar.Add(1)
 		}
+		minute++
+		invocationSchedule = s.schedule(minute)
 	}
 
-	// Pending invocations after the 24-hour period
-	//for s.cluster.UpdateStatus() {
-	//
-	//	// Scaler check for scaling down the cluster
-	//	orphans := s.scaler.ScanCluster()
-	//	log.Printf("Cluster scanned. Captured %d orphan invocations. Re-routing.\n", len(orphans))
-	//	if orphans != nil {
-	//		for _, invocation := range orphans {
-	//			s.scheduler.RouteInvocation(invocation, s.scaler)
-	//			s.Statistics.evictedInvocations += 1
-	//		}
-	//	}
-	//}
+	for _, instance := range s.cluster.instances {
+		s.cluster.totalResources += SIMULATION_DURATION - instance.launchTs
+	}
+
+	s.Statistics.totalResources = s.cluster.totalResources
 
 }
 
@@ -88,25 +89,25 @@ func (s *Simulation) updateStatus(wg *sync.WaitGroup) {
 	wg.Done()
 }
 
-func (s *Simulation) scanCluster(wg *sync.WaitGroup) {
+func (s *Simulation) scanCluster(now int, wg *sync.WaitGroup) {
 
 	// Scaler check for scaling down the cluster
-	orphans := s.scaler.ScanCluster(&s.lock)
+	orphans := s.scaler.ScanCluster(now, &s.lock)
 	//log.Printf("Cluster scanned. Captured %d orphan invocations. Re-routing.\n", len(orphans))
 	if orphans != nil {
 		for _, invocation := range orphans {
-			s.scheduler.RouteInvocation(invocation, s.scaler, &s.lock)
+			s.scheduler.RouteInvocation(invocation, s.scaler, now, &s.lock)
 			s.Statistics.evictedInvocations += 1
 		}
 	}
 	wg.Done()
 }
 
-func (s *Simulation) newRound(second []string, wg *sync.WaitGroup) {
+func (s *Simulation) newRound(second []string, now int, wg *sync.WaitGroup) {
 	// New period invocations
 	for _, invocation := range second {
 		newInvocation := NewInvocation(s.profiles[invocation])
-		s.scheduler.RouteInvocation(newInvocation, s.scaler, &s.lock)
+		s.scheduler.RouteInvocation(newInvocation, s.scaler, now, &s.lock)
 		s.Statistics.invocations += 1
 	}
 	wg.Done()
@@ -123,5 +124,6 @@ func (stats *Statistics) Display() {
 	log.Printf("Total invocations: %d\n", stats.invocations)
 	log.Printf("Total evicted invocations: %d\n", stats.evictedInvocations)
 	log.Printf("Percentage evicted invocations: %.3f\n", float32(stats.evictedInvocations)/float32(stats.invocations))
+	log.Printf("Total Instance-seconds: %d\n", stats.totalResources)
 
 }

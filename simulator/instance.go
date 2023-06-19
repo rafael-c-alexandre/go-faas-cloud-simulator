@@ -7,16 +7,16 @@ type Instance struct {
 	memory                 int64
 	currentAvailableMemory int64
 	functionsRunning       map[string]*functionInvocation
-	keepAlive              int
+	launchTs               int
 }
 
-func NewInstance() *Instance {
+func NewInstance(start int) *Instance {
 	i := Instance{
 		id:                     RandStringBytes(5),
 		memory:                 INSTANCE_MEMORY,
 		currentAvailableMemory: INSTANCE_MEMORY,
 		functionsRunning:       map[string]*functionInvocation{},
-		keepAlive:              0,
+		launchTs:               start,
 	}
 
 	return &i

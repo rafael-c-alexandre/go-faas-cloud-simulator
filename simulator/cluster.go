@@ -6,7 +6,8 @@ import (
 )
 
 type Cluster struct {
-	instances map[string]*Instance
+	instances      map[string]*Instance
+	totalResources int
 }
 
 func (c *Cluster) AddInstance(instance *Instance, globalLock *sync.RWMutex) {
@@ -14,8 +15,9 @@ func (c *Cluster) AddInstance(instance *Instance, globalLock *sync.RWMutex) {
 	//log.Printf("Adding instance. Number of current active instances %d\n", len(c.instances))
 }
 
-func (c *Cluster) DeleteInstance(id string) map[string]*functionInvocation {
+func (c *Cluster) DeleteInstance(id string, now int) map[string]*functionInvocation {
 	orphanInvocations := c.instances[id].functionsRunning
+	c.totalResources += now - c.instances[id].launchTs
 	delete(c.instances, id)
 	//log.Printf("Deleting instance. Number of current active instances %d\n", len(c.instances))
 
@@ -26,7 +28,6 @@ func (c *Cluster) UpdateStatus(globalLock *sync.RWMutex) {
 	globalLock.Lock()
 	defer globalLock.Unlock()
 	for _, instance := range c.instances {
-		instance.keepAlive += 1
 		instance.UpdateStatus(1000)
 	}
 }

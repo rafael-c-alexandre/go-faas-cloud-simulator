@@ -7,7 +7,7 @@ type Scaler struct {
 	scaleMinLoad float32
 }
 
-func (s *Scaler) ScanCluster(globalLock *sync.RWMutex) map[string]*functionInvocation {
+func (s *Scaler) ScanCluster(now int, globalLock *sync.RWMutex) map[string]*functionInvocation {
 	globalLock.Lock()
 	defer globalLock.Unlock()
 	orphanInvocations := map[string]*functionInvocation{}
@@ -17,7 +17,7 @@ func (s *Scaler) ScanCluster(globalLock *sync.RWMutex) map[string]*functionInvoc
 			instanceUsedMemory := instance.memory - instance.currentAvailableMemory
 			if s.cluster.getRemainingAvailableMemory(instance.id) >= instanceUsedMemory &&
 				len(s.cluster.instances) > 1 {
-				orphanInvocations = MergeMaps(orphanInvocations, s.ScaleDown(instance))
+				orphanInvocations = MergeMaps(orphanInvocations, s.ScaleDown(instance, now))
 
 			}
 		}
@@ -26,13 +26,13 @@ func (s *Scaler) ScanCluster(globalLock *sync.RWMutex) map[string]*functionInvoc
 	return orphanInvocations
 }
 
-func (s *Scaler) ScaleUp() *Instance {
-	newInstance := NewInstance()
+func (s *Scaler) ScaleUp(now int) *Instance {
+	newInstance := NewInstance(now)
 	s.cluster.instances[newInstance.id] = newInstance
 	return newInstance
 }
 
-func (s *Scaler) ScaleDown(instance *Instance) map[string]*functionInvocation {
-	orphanInvocations := s.cluster.DeleteInstance(instance.id)
+func (s *Scaler) ScaleDown(instance *Instance, now int) map[string]*functionInvocation {
+	orphanInvocations := s.cluster.DeleteInstance(instance.id, now)
 	return orphanInvocations
 }

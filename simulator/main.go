@@ -82,7 +82,8 @@ func estimateRelevantInvocations(listInvocations []functionProfile) {
 			if listInvocations[i].AvgDuration > 40000 {
 				relevantInvocations40 += minuteCardinality
 			}
-			if listInvocations[i].AvgDuration > 50000 {
+			if listInvocations[i].AvgDuration >
+				50000 {
 				relevantInvocations50 += minuteCardinality
 			}
 			if listInvocations[i].AvgDuration > 60000 {
@@ -191,7 +192,8 @@ func run(load float32) {
 	listInvocations = InterfaceDecode(dec, listInvocations)
 
 	// Setup simulation
-	c := &Cluster{instances: map[string]*Instance{}}
+	c := &Cluster{instances: map[string]*Instance{},
+		totalResources: 0}
 
 	simulation := Simulation{
 		cluster:   c,

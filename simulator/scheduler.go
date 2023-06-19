@@ -6,13 +6,13 @@ type Scheduler struct {
 	cluster *Cluster
 }
 
-func (s *Scheduler) RouteInvocation(invocation *functionInvocation, scaler *Scaler, globalLock *sync.RWMutex) {
+func (s *Scheduler) RouteInvocation(invocation *functionInvocation, scaler *Scaler, now int, globalLock *sync.RWMutex) {
 	globalLock.Lock()
 	defer globalLock.Unlock()
 	chosenInstance, err := s.getSuitableInstance(invocation.profile.AvgMemory)
 
 	if err != nil || chosenInstance.currentAvailableMemory < invocation.profile.AvgMemory {
-		chosenInstance = scaler.ScaleUp()
+		chosenInstance = scaler.ScaleUp(now)
 	}
 
 	chosenInstance.RunNewFunction(invocation.id, invocation)
